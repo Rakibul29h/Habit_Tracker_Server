@@ -1,9 +1,16 @@
 const express = require("express");
 const cors = require("cors");
+const admin = require("firebase-admin");
 require("dotenv").config();
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+const serviceAccount = require("path/to/serviceAccountKey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
 const port = process.env.PORT || 3000;
 const uri = process.env.MONGODB_URI;
@@ -22,6 +29,7 @@ async function run() {
     const database = client.db("habitTracker");
     const habitsCollection = database.collection("habits");
     const userscollection = database.collection("users");
+
     app.post("/users", async (req, res) => {
       const user = req.body;
       const email = req.body.email;
@@ -35,6 +43,12 @@ async function run() {
       }
     });
 
+    // add habit post method
+
+    app.post("/habit",(req,res)=>{
+      const newHabit=req.body;
+      
+    })
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
