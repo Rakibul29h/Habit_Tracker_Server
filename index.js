@@ -6,10 +6,10 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-const serviceAccount = require("path/to/serviceAccountKey.json");
+const serviceAccount = require("./habitTrackerAdminSdk.json");
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
 });
 
 const port = process.env.PORT || 3000;
@@ -22,6 +22,22 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
+
+const verifyFireBaseToken = async (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+  const token = authorization.split(" ")[1];
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.token_email = decoded.email;
+    next();
+  } catch (error) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+};
 
 async function run() {
   try {
@@ -45,10 +61,28 @@ async function run() {
 
     // add habit post method
 
-    app.post("/habit",(req,res)=>{
-      const newHabit=req.body;
-      
-    })
+    app.post("/habit", verifyFireBaseToken, async (req, res) => {
+      const newHabit = req.body;
+      const result = await habitsCollection.insertOne(newHabit);
+      res.send(result);
+    });
+
+    //  get my habit
+            app.get('/habit', verifyFireBaseToken, async (req, res) => {
+            const email = req.query.email;
+            
+            const query = {};
+            if (email) {
+                query.email = email;
+                if(email !== req.token_email){
+                    return res.status(403).send({message: 'forbidden access'})
+                }
+            }
+
+            const cursor = habitsCollection.find(query);
+            const result = await cursor.toArray();
+            res.send(result);
+        })
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
