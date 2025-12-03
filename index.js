@@ -14,7 +14,7 @@ admin.initializeApp({
 
 const port = process.env.PORT || 3000;
 const uri = process.env.MONGODB_URI;
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -59,30 +59,90 @@ async function run() {
       }
     });
 
-    // add habit post method
+
+
+    //  get my habit
+    app.get("/habit", verifyFireBaseToken, async (req, res) => {
+      const email = req.query.email;
+
+      const query = {};
+      if (email) {
+        query.email = email;
+        if (email !== req.token_email) {
+          return res.status(403).send({ message: "forbidden access" });
+        }
+      }
+
+      const habits =await habitsCollection.find(query).toArray();
+      const today=new Date().setHours(0,0,0,0);
+
+      for(const habit of habits){
+        const lastDay=habit.lastCompletedDate?new Date(habit.lastCompletedDate).setHours(0,0,0,0):null;
+
+        if(lastDay!==today)
+        {
+          await habitsCollection.updateOne({
+            _id:habit._id
+          },
+        {$set:{status:0}});
+        habit.status=0
+        }
+      }
+      
+      res.send(habits);
+    });
+
+        // add habit post method
 
     app.post("/habit", verifyFireBaseToken, async (req, res) => {
       const newHabit = req.body;
+ 
       const result = await habitsCollection.insertOne(newHabit);
       res.send(result);
     });
+    
+    // update Completed Status;
+    app.patch("/habit/:id", verifyFireBaseToken, async (req, res) => {
+      const id = req.params.id;
+      const updatedData=req.body;
+      
+      const query = { _id: new ObjectId(id) };
+      const habit = await habitsCollection.findOne(query);
+      if (!habit) return res.status(404).send({ message: "Habit not found" });
 
-    //  get my habit
-            app.get('/habit', verifyFireBaseToken, async (req, res) => {
-            const email = req.query.email;
-            
-            const query = {};
-            if (email) {
-                query.email = email;
-                if(email !== req.token_email){
-                    return res.status(403).send({message: 'forbidden access'})
-                }
-            }
 
-            const cursor = habitsCollection.find(query);
-            const result = await cursor.toArray();
-            res.send(result);
-        })
+      if(updatedData)
+      {
+      const result = await habitsCollection.updateOne(query,{
+        $set:{
+          title:updatedData.title,
+          description:updatedData.description,
+          time:updatedData.time,
+          visibility:updatedData.visibility,
+          category:updatedData.category
+        }
+      })
+       return res.send(result);
+      }else{
+        const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      await habitsCollection.updateOne(query, {
+        $push: {
+          completionHistory: new Date(),
+        },
+      });
+      const updatedHabit = await habitsCollection.findOne(query);
+      const streak = calculateStreak(updatedHabit.completionHistory);
+     const updatedResult= await habitsCollection.updateOne(query, {
+        $set: { streak: streak, status: 1,lastCompletedDate:new Date() },
+      });
+      return res.send({ modifiedCount: updatedResult.modifiedCount, streak:streak })
+      }
+      
+
+
+    });
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
@@ -90,7 +150,33 @@ async function run() {
   } finally {
   }
 }
-run().catch(console.dir);
+run().catch(console.dir); 
+
+function calculateStreak(history = []) {
+  if (history.length === 0) return 0;
+  const dates = history
+    .map((d) => new Date(d).setHours(0, 0, 0, 0))
+    .sort((a, b) => b - a);
+
+  const today = new Date().setHours(0, 0, 0, 0);
+  const yesterday = today - 1000 * 60 * 60 * 24;
+
+  if (dates[0] !== today && dates[0] !== yesterday) {
+    return 0;
+  }
+    let streak = 1;
+    for (let i = 1; i < dates.length; i++) {
+      const difference = (dates[i - 1] - dates[i]) / (1000 * 60 * 60 * 24);
+      if (difference === 1) {
+        streak++;
+      } else if (difference > 1) {
+        break;
+      }
+    }
+
+    return streak;
+  
+}
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
