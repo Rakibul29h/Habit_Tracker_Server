@@ -58,7 +58,14 @@ async function run() {
         res.send(result);
       }
     });
+    // get public habit:
 
+    app.get("/habit/public",async(req,res)=>{
+      const query={visibility:"public"};
+      const cursor=habitsCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    })
     //  get my habit
     app.get("/habit", verifyFireBaseToken, async (req, res) => {
       const email = req.query.email;
