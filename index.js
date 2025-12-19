@@ -46,6 +46,10 @@ async function run() {
     const habitsCollection = database.collection("habits");
     const userscollection = database.collection("users");
 
+    app.get("/", async (req, res) => {
+      res.send({ message: "Hello From server" });
+    });
+
     app.post("/users", async (req, res) => {
       const user = req.body;
       const email = req.body.email;
@@ -60,12 +64,20 @@ async function run() {
     });
     // get public habit:
 
-    app.get("/habit/public",async(req,res)=>{
-      const query={visibility:"public"};
-      const cursor=habitsCollection.find(query);
+    app.get("/habit/public", async (req, res) => {
+      const { filter, search } = req.query;
+
+      const query = { visibility: "public" };
+      if (filter) {
+        query.category = filter;
+      }
+      if (search) {
+        query.title = { $regex: search, $options: "i" };
+      }
+      const cursor = habitsCollection.find(query).sort({ createdAt: -1 });
       const result = await cursor.toArray();
       res.send(result);
-    })
+    });
     //  get my habit
     app.get("/habit", verifyFireBaseToken, async (req, res) => {
       const email = req.query.email;
@@ -104,8 +116,9 @@ async function run() {
 
     app.post("/habit", verifyFireBaseToken, async (req, res) => {
       const newHabit = req.body;
-
+      console.log(newHabit);
       const result = await habitsCollection.insertOne(newHabit);
+      console.log(result);
       res.send(result);
     });
 
@@ -157,7 +170,6 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await habitsCollection.deleteOne(query);
       res.send(result);
-
     });
 
     await client.db("admin").command({ ping: 1 });
