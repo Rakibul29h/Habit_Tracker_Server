@@ -78,6 +78,11 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
+
+    app.get("/habit-home",async(req,res)=>{
+      const result = await habitsCollection.find({}).limit(6).sort({createdAt:-1}).toArray();
+      res.send(result)
+    })
     //  get my habit
     app.get("/habit", verifyFireBaseToken, async (req, res) => {
       const email = req.query.email;
