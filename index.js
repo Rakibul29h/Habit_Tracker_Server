@@ -62,6 +62,8 @@ async function run() {
         res.send(result);
       }
     });
+
+    
     // get public habit:
 
     app.get("/habit/public", async (req, res) => {
@@ -97,33 +99,34 @@ async function run() {
 
       const habits = await habitsCollection.find(query).toArray();
       const today = new Date().setHours(0, 0, 0, 0);
+      const updatedHabit=habits.map(habit=>{
+        let status =0;
+        let effectiveStreak=0;
+        if(habit.lastCompletedDate)
+        {
+          const lastDay= new Date(habit.lastCompletedDate).setHours(0,0,0,0);
+          const diffdays= (today - lastDay)/86400000;
 
-      for (const habit of habits) {
-        const lastDay = habit.lastCompletedDate
-          ? new Date(habit.lastCompletedDate).setHours(0, 0, 0, 0)
-          : null;
+          if(diffdays === 0){
+            status=1}
 
-        if (lastDay !== today) {
-          await habitsCollection.updateOne(
-            {
-              _id: habit._id,
-            },
-            { $set: { status: 0 } }
-          );
-          habit.status = 0;
+          if(diffdays ===0 || diffdays===1)
+          {
+            effectiveStreak=calculateStreak(habit.completionHistory);
+          }
         }
-      }
+        return {...habit,status,effectiveStreak}
+      })
 
-      res.send(habits);
+      res.send(updatedHabit);
     });
+
 
     // add habit post method
 
     app.post("/habit", verifyFireBaseToken, async (req, res) => {
       const newHabit = req.body;
-      console.log(newHabit);
       const result = await habitsCollection.insertOne(newHabit);
-      console.log(result);
       res.send(result);
     });
 
@@ -157,13 +160,13 @@ async function run() {
           },
         });
         const updatedHabit = await habitsCollection.findOne(query);
-        const streak = calculateStreak(updatedHabit.completionHistory);
+        const effectiveStreak = calculateStreak(updatedHabit.completionHistory);
         const updatedResult = await habitsCollection.updateOne(query, {
-          $set: { streak: streak, status: 1, lastCompletedDate: new Date() },
+          $set: {status: 1, lastCompletedDate: new Date() },
         });
         return res.send({
           modifiedCount: updatedResult.modifiedCount,
-          streak: streak,
+          effectiveStreak:effectiveStreak
         });
       }
     });
