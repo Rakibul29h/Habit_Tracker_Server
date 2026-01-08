@@ -67,8 +67,8 @@ async function run() {
     // get public habit:
 
     app.get("/habit/public", async (req, res) => {
-      const { filter, search } = req.query;
-
+     
+      const { sort, limits , skip, search = "" ,filter} = req.query;
       const query = { visibility: "public" };
       if (filter) {
         query.category = filter;
@@ -76,15 +76,23 @@ async function run() {
       if (search) {
         query.title = { $regex: search, $options: "i" };
       }
-      const cursor = habitsCollection.find(query).sort({ createdAt: -1 });
+      const cursor = habitsCollection.find(query)
+      .sort({ createdAt: -1 })
+      .limit(Number(limits))
+      .skip(Number(skip));
       const result = await cursor.toArray();
-      res.send(result);
+      const totalHabit=await habitsCollection.countDocuments(query)
+
+      res.send({
+        totalHabit:totalHabit,
+        habit:result
+      });
     });
 
     app.get("/habit-home", async (req, res) => {
       const result = await habitsCollection
         .find({})
-        .limit(6)
+        .limit(12)
         .sort({ createdAt: -1 })
         .toArray();
       res.send(result);
@@ -159,7 +167,7 @@ async function run() {
 
     // get single Habit details:
 
-    app.get("/singleHabit/:id", verifyFireBaseToken, async (req, res) => {
+    app.get("/singleHabit/:id", async (req, res) => {
       const { id } = req.params;
       const habit = await habitsCollection
         .findOne({ _id: new ObjectId(id) })
