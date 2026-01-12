@@ -3,3 +3,5 @@ node_modules
 .vscode
 habitTrackerAdminSdk.json
 .vercel
+.env*.local
+habit.json

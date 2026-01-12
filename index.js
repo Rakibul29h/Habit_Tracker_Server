@@ -4,8 +4,14 @@ const admin = require("firebase-admin");
 require("dotenv").config();
 const app = express();
 app.use(express.json());
-app.use(cors());
-const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+app.use(
+  cors({
+    origin: ["https://habit-tracker-584de.web.app", "http://localhost:5173"]
+  })
+);
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
+  "utf8"
+);
 const serviceAccount = JSON.parse(decoded);
 // const serviceAccount = require("./habitTrackerAdminSdk.json");
 
@@ -42,14 +48,9 @@ const verifyFireBaseToken = async (req, res, next) => {
 
 async function run() {
   try {
-    await client.connect();
     const database = client.db("habitTracker");
     const habitsCollection = database.collection("habits");
     const userscollection = database.collection("users");
-
-    app.get("/", async (req, res) => {
-      res.send({ message: "Hello From server" });
-    });
 
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -67,8 +68,7 @@ async function run() {
     // get public habit:
 
     app.get("/habit/public", async (req, res) => {
-     
-      const { sort, limits , skip, search = "" ,filter} = req.query;
+      const { sort, limits, skip, search = "", filter } = req.query;
       const query = { visibility: "public" };
       if (filter) {
         query.category = filter;
@@ -76,16 +76,17 @@ async function run() {
       if (search) {
         query.title = { $regex: search, $options: "i" };
       }
-      const cursor = habitsCollection.find(query)
-      .sort({ createdAt: -1 })
-      .limit(Number(limits))
-      .skip(Number(skip));
+      const cursor = habitsCollection
+        .find(query)
+        .sort({ createdAt: -1 })
+        .limit(Number(limits))
+        .skip(Number(skip));
       const result = await cursor.toArray();
-      const totalHabit=await habitsCollection.countDocuments(query)
+      const totalHabit = await habitsCollection.countDocuments(query);
 
       res.send({
-        totalHabit:totalHabit,
-        habit:result
+        totalHabit: totalHabit,
+        habit: result,
       });
     });
 
@@ -169,9 +170,7 @@ async function run() {
 
     app.get("/singleHabit/:id", async (req, res) => {
       const { id } = req.params;
-      const habit = await habitsCollection
-        .findOne({ _id: new ObjectId(id) })
-        ;
+      const habit = await habitsCollection.findOne({ _id: new ObjectId(id) });
       if (!habit) {
         return res.status(404).send({ message: "Habit not found" });
       }
@@ -192,8 +191,11 @@ async function run() {
           effectiveStreak = calculateStreak(habit.completionHistory);
         }
       }
-      const progress=calculateProgress(habit.completionHistory,habit.createdAt)
-      result = { ...habit, effectiveStreak,progress };
+      const progress = calculateProgress(
+        habit.completionHistory,
+        habit.createdAt
+      );
+      result = { ...habit, effectiveStreak, progress };
       res.send(result);
     });
     //  Completed Status API;
@@ -244,11 +246,6 @@ async function run() {
       const result = await habitsCollection.deleteOne(query);
       res.send(result);
     });
-
-    // await client.db("admin").command({ ping: 1 });
-    // console.log(
-    //   "Pinged your deployment. You successfully connected to MongoDB!"
-    // );
   } finally {
   }
 }
@@ -299,7 +296,9 @@ function calculateProgress(history = [], createdAt) {
 
   return Math.round((completedDays.length / totalDays) * 100);
 }
-
+app.get("/", async (req, res) => {
+  res.send({ message: "Hello From server" });
+});
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
